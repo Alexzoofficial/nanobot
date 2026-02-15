@@ -1,0 +1,17 @@
+here{
+  "providers": {
+    "groq": {
+      "api_key": "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"
+    }
+  },
+  "agent": {
+    "engine": "groq",
+    "model": "groq/llama-3.3-70b-versatile"
+  },
+  "channels": {
+    "telegram": {
+      "token": "8536082639:AAEj_ADidWQQyHqy0wdaHh1KQeWG_lBAtrU",
+      "allowed_users": [7917718147]
+    }
+  }
+}
