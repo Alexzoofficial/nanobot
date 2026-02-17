@@ -1,5 +1,6 @@
 """Configuration schema using Pydantic."""
 
+import os
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic_settings import BaseSettings
@@ -197,7 +198,7 @@ class ProvidersConfig(BaseModel):
 class GatewayConfig(BaseModel):
     """Gateway/server configuration."""
     host: str = "0.0.0.0"
-    port: int = 18790
+    port: int = int(os.environ.get("PORT", 18790))
 
 
 class WebSearchConfig(BaseModel):

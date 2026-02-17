@@ -1,6 +1,7 @@
 """Configuration loading utilities."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,25 +21,48 @@ def get_data_dir() -> Path:
 
 def load_config(config_path: Path | None = None) -> Config:
     """
-    Load configuration from file or create default.
+    Load configuration from environment variable, file, or create default.
+
+    Priority:
+    1. NANOBOT_CONFIG environment variable (JSON string)
+    2. Explicitly provided config_path
+    3. ~/.nanobot/config.json
+    4. ./config.json (current directory)
     
     Args:
-        config_path: Optional path to config file. Uses default if not provided.
+        config_path: Optional path to config file.
     
     Returns:
         Loaded configuration object.
     """
-    path = config_path or get_config_path()
-    
-    if path.exists():
+    # 1. Try NANOBOT_CONFIG environment variable
+    env_config = os.environ.get("NANOBOT_CONFIG")
+    if env_config:
         try:
-            with open(path) as f:
-                data = json.load(f)
+            data = json.loads(env_config)
             data = _migrate_config(data)
             return Config.model_validate(convert_keys(data))
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Failed to load config from {path}: {e}")
-            print("Using default configuration.")
+            print(f"Warning: Failed to load config from NANOBOT_CONFIG: {e}")
+
+    # 2. Try file paths
+    paths = []
+    if config_path:
+        paths.append(config_path)
+    else:
+        paths.append(get_config_path())
+        paths.append(Path("config.json"))
+
+    for path in paths:
+        if path.exists():
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                data = _migrate_config(data)
+                return Config.model_validate(convert_keys(data))
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Warning: Failed to load config from {path}: {e}")
+                continue
     
     return Config()
 
