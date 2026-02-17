@@ -808,7 +808,13 @@ Alternatively, if you are using a **Web Service** (instead of Blueprint):
 -   **Start Command**: `python3 -m nanobot gateway`
 -   **Environment Variables**:
     -   `NANOBOT_CONFIG`: Your JSON config string.
+    -   `NANOBOT_PROVIDERS__GROQ__API_KEY`: Your Groq API key (alternative to `NANOBOT_CONFIG`).
     -   `PORT`: `18790` (or any port, nanobot will adapt).
+
+> [!IMPORTANT]
+> If you see `bash: line 1: echo: command not found`, it is likely due to a trailing space after a backslash (`\ `) in your Render **Start Command**.
+>
+> **Solution**: Use the `NANOBOT_CONFIG` environment variable instead of trying to `echo` the config in the start command. Set the **Start Command** to simply `python3 -m nanobot gateway`.
 
 ## 📁 Project Structure
 
