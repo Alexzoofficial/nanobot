@@ -785,6 +785,31 @@ docker run -v ~/.nanobot:/root/.nanobot --rm nanobot agent -m "Hello!"
 docker run -v ~/.nanobot:/root/.nanobot --rm nanobot status
 ```
 
+### ☁️ Deploy to Render
+
+The easiest way to deploy nanobot to [Render](https://render.com) is using the provided `render.yaml`.
+
+1.  **Fork** this repository.
+2.  In Render dashboard, click **New +** → **Blueprint**.
+3.  Connect your fork.
+4.  Set the `NANOBOT_CONFIG` environment variable as a JSON string:
+    ```json
+    {
+      "providers": {
+        "groq": { "api_key": "your-key" }
+      }
+    }
+    ```
+5.  Render will automatically detect the port and start the gateway.
+
+Alternatively, if you are using a **Web Service** (instead of Blueprint):
+-   **Runtime**: `Python` or `Docker`
+-   **Build Command**: `pip install . && (cd bridge && npm install && npm run build)` (for Python runtime)
+-   **Start Command**: `python3 -m nanobot gateway`
+-   **Environment Variables**:
+    -   `NANOBOT_CONFIG`: Your JSON config string.
+    -   `PORT`: `18790` (or any port, nanobot will adapt).
+
 ## 📁 Project Structure
 
 ```

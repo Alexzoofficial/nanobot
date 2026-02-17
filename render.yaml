@@ -1,14 +1,10 @@
 services:
   - type: web
     name: nanobot
-    runtime: python
-    # Build both the Python package and the WhatsApp bridge
-    buildCommand: pip install . && (cd bridge && npm install && npm run build)
+    runtime: docker
+    # The Dockerfile handles build and start
     # The gateway automatically respects the $PORT environment variable
     # and can be configured via NANOBOT_CONFIG or NANOBOT__* env vars.
-    startCommand: python3 -m nanobot gateway
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.1
-      - key: NODE_VERSION
-        value: 20.x
+      - key: NANOBOT_CONFIG
+        sync: false
