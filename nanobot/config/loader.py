@@ -35,36 +35,77 @@ def load_config(config_path: Path | None = None) -> Config:
     Returns:
         Loaded configuration object.
     """
+    config = None
+
     # 1. Try NANOBOT_CONFIG environment variable
     env_config = os.environ.get("NANOBOT_CONFIG")
     if env_config:
         try:
             data = json.loads(env_config)
             data = _migrate_config(data)
-            return Config.model_validate(convert_keys(data))
+            config = Config.model_validate(convert_keys(data))
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Warning: Failed to load config from NANOBOT_CONFIG: {e}")
 
     # 2. Try file paths
-    paths = []
-    if config_path:
-        paths.append(config_path)
-    else:
-        paths.append(get_config_path())
-        paths.append(Path("config.json"))
+    if config is None:
+        paths = []
+        if config_path:
+            paths.append(config_path)
+        else:
+            paths.append(get_config_path())
+            paths.append(Path("config.json"))
 
-    for path in paths:
-        if path.exists():
-            try:
-                with open(path) as f:
-                    data = json.load(f)
-                data = _migrate_config(data)
-                return Config.model_validate(convert_keys(data))
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"Warning: Failed to load config from {path}: {e}")
-                continue
+        for path in paths:
+            if path.exists():
+                try:
+                    with open(path) as f:
+                        data = json.load(f)
+                    data = _migrate_config(data)
+                    config = Config.model_validate(convert_keys(data))
+                    break
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"Warning: Failed to load config from {path}: {e}")
+                    continue
+
+    if config is None:
+        config = Config()
     
-    return Config()
+    return _apply_env_overrides(config)
+
+
+def _apply_env_overrides(config: Config) -> Config:
+    """Apply flat environment variable overrides for easy deployment."""
+    # LLM Providers
+    if key := os.environ.get("GROQ_API_KEY"):
+        config.providers.groq.api_key = key
+    if key := os.environ.get("OPENROUTER_API_KEY"):
+        config.providers.openrouter.api_key = key
+    if key := os.environ.get("OPENAI_API_KEY"):
+        config.providers.openai.api_key = key
+    if key := os.environ.get("ANTHROPIC_API_KEY"):
+        config.providers.anthropic.api_key = key
+    if key := os.environ.get("DEEPSEEK_API_KEY"):
+        config.providers.deepseek.api_key = key
+
+    # Agent
+    if model := os.environ.get("AGENT_MODEL"):
+        config.agents.defaults.model = model
+    if workspace := os.environ.get("AGENT_WORKSPACE"):
+        config.agents.defaults.workspace = workspace
+
+    # Telegram
+    if token := os.environ.get("TELEGRAM_TOKEN"):
+        config.channels.telegram.token = token
+        config.channels.telegram.enabled = True
+
+    if allowed := os.environ.get("ALLOWED_USERS"):
+        # Split by comma and strip whitespace
+        users = [u.strip() for u in allowed.split(",")]
+        # Pydantic schema expects list[str]
+        config.channels.telegram.allow_from = users
+
+    return config
 
 
 def save_config(config: Config, config_path: Path | None = None) -> None:

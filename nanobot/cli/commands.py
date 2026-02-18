@@ -303,7 +303,7 @@ def _make_provider(config):
 
 @app.command()
 def gateway(
-    port: int = typer.Option(int(os.environ.get("PORT", 18790)), "--port", "-p", help="Gateway port"),
+    port: int = typer.Option(None, "--port", "-p", help="Gateway port"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     config_json: str = typer.Option(None, "--config", "-c", help="JSON configuration string"),
 ):
@@ -324,9 +324,10 @@ def gateway(
         import logging
         logging.basicConfig(level=logging.DEBUG)
     
-    console.print(f"{__logo__} Starting nanobot gateway on port {port}...")
-    
     config = load_config()
+    final_port = port if port is not None else config.gateway.port
+
+    console.print(f"{__logo__} Starting nanobot gateway on port {final_port}...")
     bus = MessageBus()
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
@@ -399,12 +400,35 @@ def gateway(
     console.print(f"[green]✓[/green] Heartbeat: every 30m")
     
     async def run():
+        # Start health check server for cloud platforms (e.g. Render)
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+        import uvicorn
+
+        async def health_check(request):
+            return JSONResponse({"status": "ok", "version": __version__})
+
+        app_web = Starlette(debug=False, routes=[
+            Route("/", health_check),
+            Route("/health", health_check),
+        ])
+
+        config_uvicorn = uvicorn.Config(
+            app_web,
+            host="0.0.0.0",
+            port=final_port,
+            log_level="warning"
+        )
+        server = uvicorn.Server(config_uvicorn)
+
         try:
             await cron.start()
             await heartbeat.start()
             await asyncio.gather(
                 agent.run(),
                 channels.start_all(),
+                server.serve(),
             )
         except KeyboardInterrupt:
             console.print("\nShutting down...")

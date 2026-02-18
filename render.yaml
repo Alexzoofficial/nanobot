@@ -4,7 +4,7 @@ services:
     runtime: docker
     # Using Docker runtime is recommended for the best experience.
     # The gateway automatically respects the $PORT environment variable.
-    startCommand: ./render-start.sh
+    startCommand: nanobot gateway
     envVars:
       - key: NANOBOT_CONFIG
         sync: false

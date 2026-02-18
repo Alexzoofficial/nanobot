@@ -195,10 +195,17 @@ class ProvidersConfig(BaseModel):
     aihubmix: ProviderConfig = Field(default_factory=ProviderConfig)  # AiHubMix API gateway
 
 
+def get_default_port() -> int:
+    """Get the default port from the environment or use the default."""
+    try:
+        return int(os.environ.get("PORT", 18790))
+    except (ValueError, TypeError):
+        return 18790
+
 class GatewayConfig(BaseModel):
     """Gateway/server configuration."""
     host: str = "0.0.0.0"
-    port: int = int(os.environ.get("PORT", 18790))
+    port: int = Field(default_factory=get_default_port)
 
 
 class WebSearchConfig(BaseModel):

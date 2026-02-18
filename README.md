@@ -792,24 +792,26 @@ The easiest way to deploy nanobot to [Render](https://render.com) is using the p
 1.  **Fork** this repository.
 2.  In Render dashboard, click **New +** → **Blueprint**.
 3.  Connect your fork.
-4.  Set the `NANOBOT_CONFIG` environment variable as a JSON string:
-    ```json
-    {
-      "providers": {
-        "groq": { "api_key": "your-key" }
-      }
-    }
-    ```
-5.  Render will automatically detect the port and start the gateway.
+4.  Set the necessary environment variables (e.g., `GROQ_API_KEY`, `TELEGRAM_TOKEN`).
+5.  Render will automatically build and start your nanobot.
+
+#### Configuration via Environment Variables
+
+nanobot supports simple environment variables for quick deployment:
+
+| Variable | Description |
+|----------|-------------|
+| `GROQ_API_KEY` | Your Groq API key |
+| `TELEGRAM_TOKEN` | Your Telegram bot token (automatically enables Telegram) |
+| `ALLOWED_USERS` | Comma-separated list of Telegram user IDs |
+| `AGENT_MODEL` | The LLM model to use (default: `anthropic/claude-opus-4-5`) |
+| `AGENT_WORKSPACE` | Workspace path (default: `~/.nanobot/workspace`) |
+| `NANOBOT_CONFIG` | Full JSON configuration (optional, overrides others) |
 
 Alternatively, if you are using a **Web Service** (instead of Blueprint):
--   **Runtime**: `Python` or `Docker`
--   **Build Command**: `pip install . && (cd bridge && npm install && npm run build)` (for Python runtime)
--   **Start Command**: `python3 -m nanobot gateway`
--   **Environment Variables**:
-    -   `NANOBOT_CONFIG`: Your JSON config string.
-    -   `NANOBOT_PROVIDERS__GROQ__API_KEY`: Your Groq API key (alternative to `NANOBOT_CONFIG`).
-    -   `PORT`: `18790` (or any port, nanobot will adapt).
+-   **Runtime**: `Docker` (recommended)
+-   **Start Command**: `nanobot gateway`
+-   **Environment Variables**: Set `GROQ_API_KEY`, `TELEGRAM_TOKEN`, etc.
 
 > [!IMPORTANT]
 > ### 🛑 Fix: `bash: line 1: echo: command not found`
@@ -817,7 +819,7 @@ Alternatively, if you are using a **Web Service** (instead of Blueprint):
 >
 > **Quick Fix**: Change your Render **Start Command** to:
 > ```bash
-> ./render-start.sh
+> nanobot gateway
 > ```
 > And ensure you have `GROQ_API_KEY` or `NANOBOT_CONFIG` set in your environment variables.
 >
