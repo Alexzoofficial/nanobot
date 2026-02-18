@@ -125,6 +125,10 @@ def _apply_env_overrides(config: Config) -> Config:
             if hasattr(config.channels, c):
                 getattr(config.channels, c).enabled = True
 
+    # Web Tools
+    if alexzo_key := os.environ.get("ALEXZO_API_KEY"):
+        config.tools.web.search.api_key = alexzo_key
+
     return config
 
 

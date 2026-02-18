@@ -178,38 +178,38 @@ class LiteLLMProvider(LLMProvider):
                         failed_gen = match.group(1).encode().decode('unicode_escape')
 
                 if failed_gen:
-                    # If it looks like a botched tool call tags, try to strip them
-                    # <function=name{args}</function>
-                    clean_gen = re.sub(r'<function=.*?>', '', failed_gen)
-                    clean_gen = re.sub(r'</function>', '', clean_gen).strip()
+                    # 1. Try to extract tool name and JSON args
+                    # Look for <function=NAME({JSON}) or <function=NAME{JSON}
+                    match = re.search(r'<function=([^(\{\s]+)(.*)', failed_gen, re.DOTALL)
+                    if match:
+                        tool_name = match.group(1).strip()
+                        potential_json = match.group(2).strip()
 
-                    if not clean_gen:
-                        pass
-                    elif clean_gen.startswith('{'):
-                        # Try to recover tool call from JSON-like content
+                        # Strip </function> tag if present
+                        potential_json = re.sub(r'</function>.*', '', potential_json, flags=re.DOTALL).strip()
+                        # Strip surrounding parentheses if they exist around the JSON
+                        if potential_json.startswith('(') and potential_json.endswith(')'):
+                            potential_json = potential_json[1:-1].strip()
+
                         try:
-                            # If it was <function=name{...}</function>
-                            # failed_gen is <function=message{"channel": ...}</function>
-                            tool_name_match = re.search(r'<function=(.*?)[{\s]', failed_gen)
-                            if tool_name_match:
-                                tool_name = tool_name_match.group(1)
-                                tool_args = json.loads(clean_gen)
-                                return LLMResponse(
-                                    content=None,
-                                    tool_calls=[ToolCallRequest(
-                                        id="recovered",
-                                        name=tool_name,
-                                        arguments=tool_args
-                                    )],
-                                    finish_reason="tool_calls"
-                                )
+                            tool_args = json.loads(potential_json)
+                            return LLMResponse(
+                                content=None,
+                                tool_calls=[ToolCallRequest(
+                                    id="recovered",
+                                    name=tool_name,
+                                    arguments=tool_args
+                                )],
+                                finish_reason="tool_calls"
+                            )
                         except Exception:
                             pass
-                    else:
-                        return LLMResponse(
-                            content=clean_gen,
-                            finish_reason="stop",
-                        )
+
+                    # 2. Fallback: just strip tags and return as text
+                    clean_gen = re.sub(r'<function=.*?>', '', failed_gen)
+                    clean_gen = re.sub(r'<function=.*?[({]', '', clean_gen)
+                    clean_gen = re.sub(r'</function>', '', clean_gen).strip()
+                    return LLMResponse(content=clean_gen)
 
             # Return error as content for graceful handling
             return LLMResponse(

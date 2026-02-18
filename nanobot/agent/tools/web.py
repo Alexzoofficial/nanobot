@@ -44,7 +44,7 @@ def _validate_url(url: str) -> tuple[bool, str]:
 
 
 class WebSearchTool(Tool):
-    """Search the web using Brave Search API."""
+    """Search the web using Alexzo Search API (fallback to Brave)."""
     
     name = "web_search"
     description = "Search the web. Returns titles, URLs, and snippets."
@@ -58,36 +58,81 @@ class WebSearchTool(Tool):
     }
     
     def __init__(self, api_key: str | None = None, max_results: int = 5):
-        self.api_key = api_key or os.environ.get("BRAVE_API_KEY", "")
+        # Use ALEXZO_API_KEY if available, else BRAVE_API_KEY
+        self.api_key = api_key or os.environ.get("ALEXZO_API_KEY") or os.environ.get("BRAVE_API_KEY") or ""
         self.max_results = max_results
     
     async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
         if not self.api_key:
-            return "Error: BRAVE_API_KEY not configured"
+            return "Error: Web search API key not configured (ALEXZO_API_KEY or BRAVE_API_KEY)"
         
-        try:
-            n = min(max(count or self.max_results, 1), 10)
-            async with httpx.AsyncClient() as client:
-                r = await client.get(
-                    "https://api.search.brave.com/res/v1/web/search",
-                    params={"q": query, "count": n},
-                    headers={"Accept": "application/json", "X-Subscription-Token": self.api_key},
-                    timeout=10.0
-                )
-                r.raise_for_status()
-            
-            results = r.json().get("web", {}).get("results", [])
-            if not results:
-                return f"No results for: {query}"
-            
-            lines = [f"Results for: {query}\n"]
-            for i, item in enumerate(results[:n], 1):
-                lines.append(f"{i}. {item.get('title', '')}\n   {item.get('url', '')}")
-                if desc := item.get("description"):
-                    lines.append(f"   {desc}")
-            return "\n".join(lines)
-        except Exception as e:
-            return f"Error: {e}"
+        n = min(max(count or self.max_results, 1), 10)
+
+        # If it's an Alexzo key
+        if self.api_key.startswith("alexzo_"):
+            try:
+                async with httpx.AsyncClient() as client:
+                    r = await client.post(
+                        "https://alexzo.vercel.app/api/search",
+                        json={"query": query},
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        timeout=15.0
+                    )
+                    r.raise_for_status()
+
+                data = r.json()
+                # Use the whole response for context if it's small, or try to format it
+                if isinstance(data, list):
+                    results = data
+                elif isinstance(data, dict):
+                    results = data.get("results") or data.get("web", {}).get("results") or [data]
+                else:
+                    return str(data)
+
+                if not results:
+                    return f"No results for: {query}"
+
+                lines = [f"Results for: {query}\n"]
+                for i, item in enumerate(results[:n], 1):
+                    if isinstance(item, dict):
+                        title = item.get('title') or item.get('name') or "No Title"
+                        url = item.get('url') or item.get('link') or ""
+                        snippet = item.get('description') or item.get('snippet') or item.get('content') or ""
+                        lines.append(f"{i}. {title}\n   {url}")
+                        if snippet:
+                            lines.append(f"   {snippet}")
+                    else:
+                        lines.append(f"{i}. {str(item)}")
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Error using Alexzo search: {e}"
+        else:
+            # Fallback to Brave Search
+            try:
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(
+                        "https://api.search.brave.com/res/v1/web/search",
+                        params={"q": query, "count": n},
+                        headers={"Accept": "application/json", "X-Subscription-Token": self.api_key},
+                        timeout=10.0
+                    )
+                    r.raise_for_status()
+
+                results = r.json().get("web", {}).get("results", [])
+                if not results:
+                    return f"No results for: {query}"
+
+                lines = [f"Results for: {query}\n"]
+                for i, item in enumerate(results[:n], 1):
+                    lines.append(f"{i}. {item.get('title', '')}\n   {item.get('url', '')}")
+                    if desc := item.get("description"):
+                        lines.append(f"   {desc}")
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Error using Brave search: {e}"
 
 
 class WebFetchTool(Tool):
