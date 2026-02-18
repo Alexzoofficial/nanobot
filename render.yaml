@@ -2,9 +2,11 @@ services:
   - type: web
     name: nanobot
     runtime: docker
-    # The Dockerfile handles build and start
-    # The gateway automatically respects the $PORT environment variable
-    # and can be configured via NANOBOT_CONFIG or NANOBOT__* env vars.
+    # Using Docker runtime is recommended for the best experience.
+    # The gateway automatically respects the $PORT environment variable.
+    startCommand: ./render-start.sh
     envVars:
       - key: NANOBOT_CONFIG
+        sync: false
+      - key: GROQ_API_KEY
         sync: false

@@ -303,11 +303,15 @@ def _make_provider(config):
 
 @app.command()
 def gateway(
-    port: int = typer.Option(18790, "--port", "-p", help="Gateway port"),
+    port: int = typer.Option(int(os.environ.get("PORT", 18790)), "--port", "-p", help="Gateway port"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    config_json: str = typer.Option(None, "--config", "-c", help="JSON configuration string"),
 ):
     """Start the nanobot gateway."""
     from nanobot.config.loader import load_config, get_data_dir
+
+    if config_json:
+        os.environ["NANOBOT_CONFIG"] = config_json
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
     from nanobot.channels.manager import ChannelManager
@@ -427,9 +431,13 @@ def agent(
     session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanobot runtime logs during chat"),
+    config_json: str = typer.Option(None, "--config", "-c", help="JSON configuration string"),
 ):
     """Interact with the agent directly."""
     from nanobot.config.loader import load_config
+
+    if config_json:
+        os.environ["NANOBOT_CONFIG"] = config_json
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
     from loguru import logger

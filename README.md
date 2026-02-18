@@ -812,9 +812,19 @@ Alternatively, if you are using a **Web Service** (instead of Blueprint):
     -   `PORT`: `18790` (or any port, nanobot will adapt).
 
 > [!IMPORTANT]
-> If you see `bash: line 1: echo: command not found`, it is likely due to a trailing space after a backslash (`\ `) in your Render **Start Command**.
+> ### 🛑 Fix: `bash: line 1: echo: command not found`
+> If you see this error on Render, it is because of a trailing space after a backslash (`\ `) in your **Start Command**.
 >
-> **Solution**: Use the `NANOBOT_CONFIG` environment variable instead of trying to `echo` the config in the start command. Set the **Start Command** to simply `python3 -m nanobot gateway`.
+> **Quick Fix**: Change your Render **Start Command** to:
+> ```bash
+> ./render-start.sh
+> ```
+> And ensure you have `GROQ_API_KEY` or `NANOBOT_CONFIG` set in your environment variables.
+>
+> Alternatively, use the `--config` flag:
+> ```bash
+> python3 -m nanobot gateway --config '{"providers": {"groq": {"api_key": "your-key"}}}'
+> ```
 
 ## 📁 Project Structure
 
