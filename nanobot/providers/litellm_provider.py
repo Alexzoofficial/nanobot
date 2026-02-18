@@ -156,6 +156,61 @@ class LiteLLMProvider(LLMProvider):
             response = await acompletion(**kwargs)
             return self._parse_response(response)
         except Exception as e:
+            error_str = str(e)
+            # Handle Groq-specific tool use failure
+            if "tool_use_failed" in error_str and "failed_generation" in error_str:
+                import re
+                # Try to extract content from failed_generation if it's just text or a botched tool call
+                failed_gen = None
+                # Groq error is often "GroqException - { ... }"
+                json_part_match = re.search(r'(\{.*\})', error_str)
+                if json_part_match:
+                    try:
+                        error_json = json.loads(json_part_match.group(1))
+                        failed_gen = error_json.get("error", {}).get("failed_generation")
+                    except Exception:
+                        pass
+
+                # Fallback to regex if JSON parsing failed
+                if not failed_gen:
+                    match = re.search(r'"failed_generation":\s*"(.*?)(?<!\\)"', error_str)
+                    if match:
+                        failed_gen = match.group(1).encode().decode('unicode_escape')
+
+                if failed_gen:
+                    # If it looks like a botched tool call tags, try to strip them
+                    # <function=name{args}</function>
+                    clean_gen = re.sub(r'<function=.*?>', '', failed_gen)
+                    clean_gen = re.sub(r'</function>', '', clean_gen).strip()
+
+                    if not clean_gen:
+                        pass
+                    elif clean_gen.startswith('{'):
+                        # Try to recover tool call from JSON-like content
+                        try:
+                            # If it was <function=name{...}</function>
+                            # failed_gen is <function=message{"channel": ...}</function>
+                            tool_name_match = re.search(r'<function=(.*?)[{\s]', failed_gen)
+                            if tool_name_match:
+                                tool_name = tool_name_match.group(1)
+                                tool_args = json.loads(clean_gen)
+                                return LLMResponse(
+                                    content=None,
+                                    tool_calls=[ToolCallRequest(
+                                        id="recovered",
+                                        name=tool_name,
+                                        arguments=tool_args
+                                    )],
+                                    finish_reason="tool_calls"
+                                )
+                        except Exception:
+                            pass
+                    else:
+                        return LLMResponse(
+                            content=clean_gen,
+                            finish_reason="stop",
+                        )
+
             # Return error as content for graceful handling
             return LLMResponse(
                 content=f"Error calling LLM: {str(e)}",

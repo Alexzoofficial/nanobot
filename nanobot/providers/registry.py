@@ -299,6 +299,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 
     # Groq: mainly used for Whisper voice transcription, also usable for LLM.
     # Needs "groq/" prefix for LiteLLM routing. Placed last — it rarely wins fallback.
+    # Disables parallel tool calls for better reliability with Llama 3 models.
     ProviderSpec(
         name="groq",
         keywords=("groq",),
@@ -313,7 +314,9 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         detect_by_base_keyword="",
         default_api_base="",
         strip_model_prefix=False,
-        model_overrides=(),
+        model_overrides=(
+            ("", {"parallel_tool_calls": False}),
+        ),
     ),
 )
 
