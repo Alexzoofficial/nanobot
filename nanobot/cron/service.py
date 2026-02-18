@@ -82,6 +82,7 @@ class CronService:
                         payload=CronPayload(
                             kind=j["payload"].get("kind", "agent_turn"),
                             message=j["payload"].get("message", ""),
+                            url=j["payload"].get("url"),
                             deliver=j["payload"].get("deliver", False),
                             channel=j["payload"].get("channel"),
                             to=j["payload"].get("to"),
@@ -129,6 +130,7 @@ class CronService:
                     "payload": {
                         "kind": j.payload.kind,
                         "message": j.payload.message,
+                        "url": j.payload.url,
                         "deliver": j.payload.deliver,
                         "channel": j.payload.channel,
                         "to": j.payload.to,
@@ -224,9 +226,16 @@ class CronService:
         logger.info(f"Cron: executing job '{job.name}' ({job.id})")
         
         try:
-            response = None
-            if self.on_job:
-                response = await self.on_job(job)
+            if job.payload.kind == "url_ping" and job.payload.url:
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    await client.get(job.payload.url, timeout=10.0)
+                logger.info(f"Cron: pinged URL {job.payload.url}")
+                response = "Ping successful"
+            else:
+                response = None
+                if self.on_job:
+                    response = await self.on_job(job)
             
             job.state.last_status = "ok"
             job.state.last_error = None
@@ -263,7 +272,9 @@ class CronService:
         self,
         name: str,
         schedule: CronSchedule,
-        message: str,
+        message: str = "",
+        kind: str = "agent_turn",
+        url: str | None = None,
         deliver: bool = False,
         channel: str | None = None,
         to: str | None = None,
@@ -280,8 +291,9 @@ class CronService:
             enabled=True,
             schedule=schedule,
             payload=CronPayload(
-                kind="agent_turn",
+                kind=kind,
                 message=message,
+                url=url,
                 deliver=deliver,
                 channel=channel,
                 to=to,

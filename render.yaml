@@ -8,5 +8,16 @@ services:
     envVars:
       - key: NANOBOT_CONFIG
         sync: false
+        description: "Full JSON configuration (optional if using flat env vars)"
       - key: GROQ_API_KEY
         sync: false
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: ALLOWED_USERS
+        sync: false
+        description: "Comma-separated list of allowed user IDs/usernames"
+      - key: ALEXZO_API_KEY
+        sync: false
+      - key: BIGQUERY_KEY_JSON
+        sync: false
+        description: "Service Account JSON content for BigQuery"

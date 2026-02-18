@@ -397,7 +397,8 @@ def gateway(
             cron.add_job(
                 name="Render Keep-Alive",
                 schedule=CronSchedule(kind="every", every_ms=5 * 60 * 1000), # 5 minutes
-                message=f"Hit the health check URL to keep Render awake: {render_url}/health",
+                kind="url_ping",
+                url=f"{render_url}/health",
                 job_id=keep_alive_job_id
             )
             console.print(f"[green]✓[/green] Added Render keep-alive job for {render_url}")
