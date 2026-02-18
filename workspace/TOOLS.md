@@ -63,6 +63,20 @@ web_fetch(url: str, extractMode: str = "markdown", maxChars: int = 50000) -> str
 - Supports markdown or plain text extraction
 - Output is truncated at 50,000 characters by default
 
+## Data & Analytics
+
+### bigquery
+Execute queries, read and write data to Google BigQuery.
+```
+bigquery(operation: str, query: str = None, dataset_id: str = None, table_id: str = None, rows: list = None) -> str
+```
+
+**Operations:**
+- `query`: Run SQL query
+- `insert`: Insert rows of data (as JSON)
+- `list_datasets`: List available datasets
+- `list_tables`: List tables in a dataset
+
 ## Communication
 
 ### message

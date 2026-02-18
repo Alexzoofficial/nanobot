@@ -129,6 +129,13 @@ def _apply_env_overrides(config: Config) -> Config:
     if alexzo_key := os.environ.get("ALEXZO_API_KEY"):
         config.tools.web.search.api_key = alexzo_key
 
+    # BigQuery
+    if bq_key := os.environ.get("BIGQUERY_KEY_JSON"):
+        key_path = Path.home() / ".nanobot" / "bigquery-key.json"
+        if not key_path.exists():
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(bq_key)
+
     return config
 
 

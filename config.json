@@ -1,4 +1,4 @@
-here{
+{
   "providers": {
     "groq": {
       "api_key": "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"
@@ -12,6 +12,13 @@ here{
     "telegram": {
       "token": "8536082639:AAEj_ADidWQQyHqy0wdaHh1KQeWG_lBAtrU",
       "allowed_users": [7917718147]
+    }
+  },
+  "tools": {
+    "web": {
+      "search": {
+        "api_key": "alexzo_d6ld7tundbcpi5bklna74n"
+      }
     }
   }
 }

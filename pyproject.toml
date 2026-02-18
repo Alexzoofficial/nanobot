@@ -39,6 +39,7 @@ dependencies = [
     "python-socks[asyncio]>=2.4.0",
     "prompt-toolkit>=3.0.0",
     "mcp>=1.0.0",
+    "google-cloud-bigquery>=3.0.0",
 ]
 
 [project.optional-dependencies]

@@ -388,6 +388,20 @@ def gateway(
     # Create channel manager
     channels = ChannelManager(config, bus)
     
+    # Add Render keep-alive job if on Render
+    render_url = os.environ.get("RENDER_EXTERNAL_URL") or "https://nanobotai.onrender.com"
+    if render_url:
+        from nanobot.cron.types import CronSchedule
+        keep_alive_job_id = "render-keep-alive"
+        if not any(j.id == keep_alive_job_id for j in cron.list_jobs()):
+            cron.add_job(
+                name="Render Keep-Alive",
+                schedule=CronSchedule(kind="every", every_ms=5 * 60 * 1000), # 5 minutes
+                message=f"Hit the health check URL to keep Render awake: {render_url}/health",
+                job_id=keep_alive_job_id
+            )
+            console.print(f"[green]✓[/green] Added Render keep-alive job for {render_url}")
+
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
     else:
