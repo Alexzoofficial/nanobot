@@ -87,6 +87,10 @@ def _apply_env_overrides(config: Config) -> Config:
         config.providers.anthropic.api_key = key
     if key := os.environ.get("DEEPSEEK_API_KEY"):
         config.providers.deepseek.api_key = key
+    if key := os.environ.get("GEMINI_API_KEY"):
+        config.providers.gemini.api_key = key
+    if key := os.environ.get("ZHIPU_API_KEY") or os.environ.get("ZHIPUAI_API_KEY"):
+        config.providers.zhipu.api_key = key
 
     # Agent
     if model := os.environ.get("AGENT_MODEL"):
@@ -99,11 +103,16 @@ def _apply_env_overrides(config: Config) -> Config:
         config.channels.telegram.token = token
         config.channels.telegram.enabled = True
 
-    if allowed := os.environ.get("ALLOWED_USERS"):
+    if allowed := os.environ.get("ALLOWED_USERS") or os.environ.get("TELEGRAM_ALLOWED_USERS"):
         # Split by comma and strip whitespace
         users = [u.strip() for u in allowed.split(",")]
-        # Pydantic schema expects list[str]
         config.channels.telegram.allow_from = users
+
+    # WhatsApp (basic support via env)
+    if os.environ.get("WHATSAPP_ENABLED", "").lower() == "true":
+        config.channels.whatsapp.enabled = True
+    if wa_allow := os.environ.get("WHATSAPP_ALLOWED_NUMBERS"):
+        config.channels.whatsapp.allow_from = [n.strip() for n in wa_allow.split(",")]
 
     return config
 
