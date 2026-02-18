@@ -802,15 +802,15 @@ nanobot supports simple environment variables for quick deployment:
 | Variable | Description |
 |----------|-------------|
 | `GROQ_API_KEY` | Your Groq API key |
-| `TELEGRAM_TOKEN` | Your Telegram bot token (automatically enables Telegram) |
+| `TELEGRAM_TOKEN` | Your Telegram bot token |
 | `ALLOWED_USERS` | Comma-separated list of Telegram user IDs |
-| `AGENT_MODEL` | The LLM model to use (default: `anthropic/claude-opus-4-5`) |
-| `AGENT_WORKSPACE` | Workspace path (default: `~/.nanobot/workspace`) |
+| `AGENT_MODEL` | The LLM model to use (e.g. `groq/llama-3.3-70b-versatile`) |
+| `CHANNELS` | Comma-separated enabled channels (e.g. `telegram,whatsapp`) |
 | `NANOBOT_CONFIG` | Full JSON configuration (optional, overrides others) |
 
 Alternatively, if you are using a **Web Service** (instead of Blueprint):
 -   **Runtime**: `Docker` (recommended)
--   **Start Command**: `nanobot gateway`
+-   **Start Command**: (leave empty to use Docker default)
 -   **Environment Variables**: Set `GROQ_API_KEY`, `TELEGRAM_TOKEN`, etc.
 
 > [!IMPORTANT]

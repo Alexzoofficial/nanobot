@@ -70,14 +70,14 @@ def load_config(config_path: Path | None = None) -> Config:
 
     if config is None:
         config = Config()
-    
+
     return _apply_env_overrides(config)
 
 
 def _apply_env_overrides(config: Config) -> Config:
     """Apply flat environment variable overrides for easy deployment."""
     # LLM Providers
-    if key := os.environ.get("GROQ_API_KEY"):
+    if key := os.environ.get("GROQ_API_KEY") or os.environ.get("LITELLM_GROQ_API_KEY"):
         config.providers.groq.api_key = key
     if key := os.environ.get("OPENROUTER_API_KEY"):
         config.providers.openrouter.api_key = key
@@ -93,10 +93,14 @@ def _apply_env_overrides(config: Config) -> Config:
         config.providers.zhipu.api_key = key
 
     # Agent
-    if model := os.environ.get("AGENT_MODEL"):
+    if model := os.environ.get("AGENT_MODEL") or os.environ.get("MODEL"):
         config.agents.defaults.model = model
     if workspace := os.environ.get("AGENT_WORKSPACE"):
         config.agents.defaults.workspace = workspace
+    if os.environ.get("AGENT_ENGINE"):
+        # We don't have a direct engine field, it's inferred from the model,
+        # but some users might expect it.
+        pass
 
     # Telegram
     if token := os.environ.get("TELEGRAM_TOKEN"):
@@ -113,6 +117,13 @@ def _apply_env_overrides(config: Config) -> Config:
         config.channels.whatsapp.enabled = True
     if wa_allow := os.environ.get("WHATSAPP_ALLOWED_NUMBERS"):
         config.channels.whatsapp.allow_from = [n.strip() for n in wa_allow.split(",")]
+
+    # Generic CHANNELS env var (e.g. CHANNELS=telegram,whatsapp)
+    if channels_env := os.environ.get("CHANNELS"):
+        enabled_list = [c.strip().lower() for c in channels_env.split(",")]
+        for c in enabled_list:
+            if hasattr(config.channels, c):
+                getattr(config.channels, c).enabled = True
 
     return config
 
