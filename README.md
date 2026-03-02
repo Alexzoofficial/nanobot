@@ -785,6 +785,49 @@ docker run -v ~/.nanobot:/root/.nanobot --rm nanobot agent -m "Hello!"
 docker run -v ~/.nanobot:/root/.nanobot --rm nanobot status
 ```
 
+### ☁️ Deploy to Render
+
+The easiest way to deploy nanobot to [Render](https://render.com) is using the provided `render.yaml`.
+
+1.  **Fork** this repository.
+2.  In Render dashboard, click **New +** → **Blueprint**.
+3.  Connect your fork.
+4.  Set the necessary environment variables (e.g., `GROQ_API_KEY`, `TELEGRAM_TOKEN`).
+5.  Render will automatically build and start your nanobot.
+
+#### Configuration via Environment Variables
+
+nanobot supports simple environment variables for quick deployment:
+
+| Variable | Description |
+|----------|-------------|
+| `GROQ_API_KEY` | Your Groq API key |
+| `TELEGRAM_TOKEN` | Your Telegram bot token |
+| `ALLOWED_USERS` | Comma-separated list of Telegram user IDs |
+| `AGENT_MODEL` | The LLM model to use (e.g. `groq/llama-3.3-70b-versatile`) |
+| `CHANNELS` | Comma-separated enabled channels (e.g. `telegram,whatsapp`) |
+| `NANOBOT_CONFIG` | Full JSON configuration (optional, overrides others) |
+
+Alternatively, if you are using a **Web Service** (instead of Blueprint):
+-   **Runtime**: `Docker` (recommended)
+-   **Start Command**: (leave empty to use Docker default)
+-   **Environment Variables**: Set `GROQ_API_KEY`, `TELEGRAM_TOKEN`, etc.
+
+> [!IMPORTANT]
+> ### 🛑 Fix: `bash: line 1: echo: command not found`
+> If you see this error on Render, it is because of a trailing space after a backslash (`\ `) in your **Start Command**.
+>
+> **Quick Fix**: Change your Render **Start Command** to:
+> ```bash
+> nanobot gateway
+> ```
+> And ensure you have `GROQ_API_KEY` or `NANOBOT_CONFIG` set in your environment variables.
+>
+> Alternatively, use the `--config` flag:
+> ```bash
+> python3 -m nanobot gateway --config '{"providers": {"groq": {"api_key": "your-key"}}}'
+> ```
+
 ## 📁 Project Structure
 
 ```

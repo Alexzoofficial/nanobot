@@ -48,6 +48,8 @@ class LiteLLMProvider(LLMProvider):
         litellm.suppress_debug_info = True
         # Drop unsupported parameters for providers (e.g., gpt-5 rejects some params)
         litellm.drop_params = True
+        # Retry on rate limits
+        litellm.num_retries = 3
     
     def _setup_env(self, api_key: str, api_base: str | None, model: str) -> None:
         """Set environment variables based on detected provider."""
@@ -156,6 +158,61 @@ class LiteLLMProvider(LLMProvider):
             response = await acompletion(**kwargs)
             return self._parse_response(response)
         except Exception as e:
+            error_str = str(e)
+            # Handle Groq-specific tool use failure
+            if "tool_use_failed" in error_str and "failed_generation" in error_str:
+                import re
+                # Try to extract content from failed_generation if it's just text or a botched tool call
+                failed_gen = None
+                # Groq error is often "GroqException - { ... }"
+                json_part_match = re.search(r'(\{.*\})', error_str)
+                if json_part_match:
+                    try:
+                        error_json = json.loads(json_part_match.group(1))
+                        failed_gen = error_json.get("error", {}).get("failed_generation")
+                    except Exception:
+                        pass
+
+                # Fallback to regex if JSON parsing failed
+                if not failed_gen:
+                    match = re.search(r'"failed_generation":\s*"(.*?)(?<!\\)"', error_str)
+                    if match:
+                        failed_gen = match.group(1).encode().decode('unicode_escape')
+
+                if failed_gen:
+                    # 1. Try to extract tool name and JSON args
+                    # Look for <function=NAME({JSON}) or <function=NAME{JSON}
+                    match = re.search(r'<function=([^(\{\s]+)(.*)', failed_gen, re.DOTALL)
+                    if match:
+                        tool_name = match.group(1).strip()
+                        potential_json = match.group(2).strip()
+
+                        # Strip </function> tag if present
+                        potential_json = re.sub(r'</function>.*', '', potential_json, flags=re.DOTALL).strip()
+                        # Strip surrounding parentheses if they exist around the JSON
+                        if potential_json.startswith('(') and potential_json.endswith(')'):
+                            potential_json = potential_json[1:-1].strip()
+
+                        try:
+                            tool_args = json.loads(potential_json)
+                            return LLMResponse(
+                                content=None,
+                                tool_calls=[ToolCallRequest(
+                                    id="recovered",
+                                    name=tool_name,
+                                    arguments=tool_args
+                                )],
+                                finish_reason="tool_calls"
+                            )
+                        except Exception:
+                            pass
+
+                    # 2. Fallback: just strip tags and return as text
+                    clean_gen = re.sub(r'<function=.*?>', '', failed_gen)
+                    clean_gen = re.sub(r'<function=.*?[({]', '', clean_gen)
+                    clean_gen = re.sub(r'</function>', '', clean_gen).strip()
+                    return LLMResponse(content=clean_gen)
+
             # Return error as content for graceful handling
             return LLMResponse(
                 content=f"Error calling LLM: {str(e)}",

@@ -303,11 +303,15 @@ def _make_provider(config):
 
 @app.command()
 def gateway(
-    port: int = typer.Option(18790, "--port", "-p", help="Gateway port"),
+    port: int = typer.Option(None, "--port", "-p", help="Gateway port"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    config_json: str = typer.Option(None, "--config", "-c", help="JSON configuration string"),
 ):
     """Start the nanobot gateway."""
     from nanobot.config.loader import load_config, get_data_dir
+
+    if config_json:
+        os.environ["NANOBOT_CONFIG"] = config_json
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
     from nanobot.channels.manager import ChannelManager
@@ -320,9 +324,10 @@ def gateway(
         import logging
         logging.basicConfig(level=logging.DEBUG)
     
-    console.print(f"{__logo__} Starting nanobot gateway on port {port}...")
-    
     config = load_config()
+    final_port = port if port is not None else config.gateway.port
+
+    console.print(f"{__logo__} Starting nanobot gateway on port {final_port}...")
     bus = MessageBus()
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
@@ -383,6 +388,21 @@ def gateway(
     # Create channel manager
     channels = ChannelManager(config, bus)
     
+    # Add Render keep-alive job if on Render
+    render_url = os.environ.get("RENDER_EXTERNAL_URL") or "https://nanobotai.onrender.com"
+    if render_url:
+        from nanobot.cron.types import CronSchedule
+        keep_alive_job_id = "render-keep-alive"
+        if not any(j.id == keep_alive_job_id for j in cron.list_jobs()):
+            cron.add_job(
+                name="Render Keep-Alive",
+                schedule=CronSchedule(kind="every", every_ms=5 * 60 * 1000), # 5 minutes
+                kind="url_ping",
+                url=f"{render_url}/health",
+                job_id=keep_alive_job_id
+            )
+            console.print(f"[green]✓[/green] Added Render keep-alive job for {render_url}")
+
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
     else:
@@ -395,12 +415,35 @@ def gateway(
     console.print(f"[green]✓[/green] Heartbeat: every 30m")
     
     async def run():
+        # Start health check server for cloud platforms (e.g. Render)
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+        import uvicorn
+
+        async def health_check(request):
+            return JSONResponse({"status": "ok", "version": __version__})
+
+        app_web = Starlette(debug=False, routes=[
+            Route("/", health_check),
+            Route("/health", health_check),
+        ])
+
+        config_uvicorn = uvicorn.Config(
+            app_web,
+            host="0.0.0.0",
+            port=final_port,
+            log_level="warning"
+        )
+        server = uvicorn.Server(config_uvicorn)
+
         try:
             await cron.start()
             await heartbeat.start()
             await asyncio.gather(
                 agent.run(),
                 channels.start_all(),
+                server.serve(),
             )
         except KeyboardInterrupt:
             console.print("\nShutting down...")
@@ -427,9 +470,13 @@ def agent(
     session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanobot runtime logs during chat"),
+    config_json: str = typer.Option(None, "--config", "-c", help="JSON configuration string"),
 ):
     """Interact with the agent directly."""
     from nanobot.config.loader import load_config
+
+    if config_json:
+        os.environ["NANOBOT_CONFIG"] = config_json
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
     from loguru import logger

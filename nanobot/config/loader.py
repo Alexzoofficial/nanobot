@@ -1,6 +1,7 @@
 """Configuration loading utilities."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,27 +21,122 @@ def get_data_dir() -> Path:
 
 def load_config(config_path: Path | None = None) -> Config:
     """
-    Load configuration from file or create default.
+    Load configuration from environment variable, file, or create default.
+
+    Priority:
+    1. NANOBOT_CONFIG environment variable (JSON string)
+    2. Explicitly provided config_path
+    3. ~/.nanobot/config.json
+    4. ./config.json (current directory)
     
     Args:
-        config_path: Optional path to config file. Uses default if not provided.
+        config_path: Optional path to config file.
     
     Returns:
         Loaded configuration object.
     """
-    path = config_path or get_config_path()
-    
-    if path.exists():
+    config = None
+
+    # 1. Try NANOBOT_CONFIG environment variable
+    env_config = os.environ.get("NANOBOT_CONFIG")
+    if env_config:
         try:
-            with open(path) as f:
-                data = json.load(f)
+            data = json.loads(env_config)
             data = _migrate_config(data)
-            return Config.model_validate(convert_keys(data))
+            config = Config.model_validate(convert_keys(data))
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Failed to load config from {path}: {e}")
-            print("Using default configuration.")
-    
-    return Config()
+            print(f"Warning: Failed to load config from NANOBOT_CONFIG: {e}")
+
+    # 2. Try file paths
+    if config is None:
+        paths = []
+        if config_path:
+            paths.append(config_path)
+        else:
+            paths.append(get_config_path())
+            paths.append(Path("config.json"))
+
+        for path in paths:
+            if path.exists():
+                try:
+                    with open(path) as f:
+                        data = json.load(f)
+                    data = _migrate_config(data)
+                    config = Config.model_validate(convert_keys(data))
+                    break
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"Warning: Failed to load config from {path}: {e}")
+                    continue
+
+    if config is None:
+        config = Config()
+
+    return _apply_env_overrides(config)
+
+
+def _apply_env_overrides(config: Config) -> Config:
+    """Apply flat environment variable overrides for easy deployment."""
+    # LLM Providers
+    if key := os.environ.get("GROQ_API_KEY") or os.environ.get("LITELLM_GROQ_API_KEY"):
+        config.providers.groq.api_key = key
+    if key := os.environ.get("OPENROUTER_API_KEY"):
+        config.providers.openrouter.api_key = key
+    if key := os.environ.get("OPENAI_API_KEY"):
+        config.providers.openai.api_key = key
+    if key := os.environ.get("ANTHROPIC_API_KEY"):
+        config.providers.anthropic.api_key = key
+    if key := os.environ.get("DEEPSEEK_API_KEY"):
+        config.providers.deepseek.api_key = key
+    if key := os.environ.get("GEMINI_API_KEY"):
+        config.providers.gemini.api_key = key
+    if key := os.environ.get("ZHIPU_API_KEY") or os.environ.get("ZHIPUAI_API_KEY"):
+        config.providers.zhipu.api_key = key
+
+    # Agent
+    if model := os.environ.get("AGENT_MODEL") or os.environ.get("MODEL"):
+        config.agents.defaults.model = model
+    if workspace := os.environ.get("AGENT_WORKSPACE"):
+        config.agents.defaults.workspace = workspace
+    if os.environ.get("AGENT_ENGINE"):
+        # We don't have a direct engine field, it's inferred from the model,
+        # but some users might expect it.
+        pass
+
+    # Telegram
+    if token := os.environ.get("TELEGRAM_TOKEN"):
+        config.channels.telegram.token = token
+        config.channels.telegram.enabled = True
+
+    if allowed := os.environ.get("ALLOWED_USERS") or os.environ.get("TELEGRAM_ALLOWED_USERS"):
+        # Split by comma and strip whitespace
+        users = [u.strip() for u in allowed.split(",")]
+        config.channels.telegram.allow_from = users
+
+    # WhatsApp (basic support via env)
+    if os.environ.get("WHATSAPP_ENABLED", "").lower() == "true":
+        config.channels.whatsapp.enabled = True
+    if wa_allow := os.environ.get("WHATSAPP_ALLOWED_NUMBERS"):
+        config.channels.whatsapp.allow_from = [n.strip() for n in wa_allow.split(",")]
+
+    # Generic CHANNELS env var (e.g. CHANNELS=telegram,whatsapp)
+    if channels_env := os.environ.get("CHANNELS"):
+        enabled_list = [c.strip().lower() for c in channels_env.split(",")]
+        for c in enabled_list:
+            if hasattr(config.channels, c):
+                getattr(config.channels, c).enabled = True
+
+    # Web Tools
+    if alexzo_key := os.environ.get("ALEXZO_API_KEY"):
+        config.tools.web.search.api_key = alexzo_key
+
+    # BigQuery
+    if bq_key := os.environ.get("BIGQUERY_KEY_JSON"):
+        key_path = Path.home() / ".nanobot" / "bigquery-key.json"
+        if not key_path.exists():
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(bq_key)
+
+    return config
 
 
 def save_config(config: Config, config_path: Path | None = None) -> None:
@@ -65,10 +161,17 @@ def save_config(config: Config, config_path: Path | None = None) -> None:
 def _migrate_config(data: dict) -> dict:
     """Migrate old config formats to current."""
     # Move tools.exec.restrictToWorkspace → tools.restrictToWorkspace
-    tools = data.get("tools", {})
-    exec_cfg = tools.get("exec", {})
-    if "restrictToWorkspace" in exec_cfg and "restrictToWorkspace" not in tools:
-        tools["restrictToWorkspace"] = exec_cfg.pop("restrictToWorkspace")
+    if "tools" in data:
+        tools = data["tools"]
+        if "exec" in tools:
+            exec_cfg = tools["exec"]
+            if "restrictToWorkspace" in exec_cfg and "restrictToWorkspace" not in tools:
+                tools["restrictToWorkspace"] = exec_cfg.pop("restrictToWorkspace")
+
+    # Alias agent -> agents.defaults
+    if "agent" in data and "agents" not in data:
+        data["agents"] = {"defaults": data.pop("agent")}
+
     return data
 
 

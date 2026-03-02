@@ -34,7 +34,7 @@ class MessageTool(Tool):
     
     @property
     def description(self) -> str:
-        return "Send a message to the user. Use this when you want to communicate something."
+        return "Send a message to a user on a specific channel. Use ONLY when explicitly asked to notify someone or send to a different channel. DO NOT use for normal conversation replies."
     
     @property
     def parameters(self) -> dict[str, Any]:
